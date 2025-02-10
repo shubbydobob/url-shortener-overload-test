@@ -3,6 +3,7 @@ package com.project.url_shortener.ShortUrl.Service;
 import com.project.url_shortener.ShortUrl.Domain.ShortUrl;
 import com.project.url_shortener.ShortUrl.Repository.ShortUrlRepository;
 import jakarta.transaction.Transactional;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
@@ -42,20 +43,22 @@ public class ShortUrlService {
         return shortCode;
     }
 
-    public Optional<String> getOriginalUrl(String shortCode){
+    @Cacheable(value = "shortened_urls", key = "#shortCode")
+    public Optional<String> getOriginalUrl(String shortCode) {
 
-        // Redis에서 먼저 조회
         String cachedUrl = redisTemplate.opsForValue().get(shortCode);
-        if(cachedUrl != null){
+        if (cachedUrl != null) {
+            System.out.println("캐싱된 데이터 사용: " + cachedUrl);
             return Optional.of(cachedUrl);
         }
 
-        // Redis에 없으면 MYSQL에서 조회하고 캐싱
         return shortUrlRepository.findByShortCode(shortCode).map(url -> {
             redisTemplate.opsForValue().set(shortCode, url.getOriginalUrl(), CACHE_TTL, TimeUnit.SECONDS);
+            System.out.println("캐싱 저장: " + url.getOriginalUrl());
             return url.getOriginalUrl();
         });
     }
+
 
     private String generateRandomCode(){
         Random random = new Random();
